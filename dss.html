@@ -1,24 +1,22 @@
 <dl id='home-slide' class='dss'>
-    <dt><a href='#' title='' ><img src='stevens-slider.jpg' alt='' /></a></dt>
-        <dd><p>Students sit on steps listening to a professor in a robe</p></dd>
+    <dt><a href='#' title='' ><img src='image-1.jpg' alt='' /></a></dt>
+        <dd><p>This is a caption.</p></dd>
 </dl>
 
 <script src='dss-min.js' type='text/javascript' ></script>
 <script type='text/javascript' >
 //<![CDATA[
-if(document.getElementById('mobile-link').offsetWidth===0){
-    var s = dss('home-slide',{
-        'new-slides' : [
-            {'content' :
-              "<a href='#' title='' ><img src='stevens-slider.jpg' alt='' /></a>",
-            'caption' : 
-              '<p>another caption to boot!</p>'},
-            {'content' :
-              "<a href='#' title='' ><img src='stevens-slider.jpg' alt='' /></a>",
-            'caption' : 
-              '<p>Wowee! Three slides!</p>'}
-        ]
-    });
-}
+var s = dss('home-slide',{
+    'new-slides' : [
+        {'content' :
+          "<a href='#' title='' ><img src='image-2.jpg' alt='' /></a>",
+        'caption' : 
+          '<p>another caption to boot!</p>'},
+        {'content' :
+          "<a href='#' title='' ><img src='image-3.jpg' alt='' /></a>",
+        'caption' : 
+          '<p>Wowee! Three slides!</p>'}
+    ]
+});
 //]]>
 </script>
