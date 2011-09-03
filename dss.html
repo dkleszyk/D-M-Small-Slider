@@ -1,22 +1,46 @@
-<dl id='home-slide' class='dss'>
-    <dt><a href='#' title='' ><img src='image-1.jpg' alt='' /></a></dt>
+<html>
+<head>
+<title>test</title>
+<link href='dss.css' rel='stylesheet' />
+<style type='text/css'>
+#one {
+    background:#ff0;
+    height:300px;
+}
+#two {
+    background:#f0f;
+    height:300px;
+}
+dt {
+    background:#0ff;
+    height:300px;
+}
+}
+</style>
+
+</head>
+<body>
+
+<dl id='dss-slide' class='dss'>
+    <dt id='one' ><a href='#' title='' >Slide 1</a></dt>
         <dd><p>This is a caption.</p></dd>
+    <dt id='two' ><a href='#' id = 'two' title='' >Slide 2</a></dt>
+        <dd><p>Two for good measure.</p></dd>
 </dl>
 
-<script src='dss-min.js' type='text/javascript' ></script>
+<script src='dss3-min2.js' type='text/javascript' ></script>
 <script type='text/javascript' >
 //<![CDATA[
-var s = dss('home-slide',{
+var s = dss.slider('dss-slide',{
     'new-slides' : [
         {'content' :
-          "<a href='#' title='' ><img src='image-2.jpg' alt='' /></a>",
+          "<a href='#' title='' >Slide 3</a>",
         'caption' : 
-          '<p>another caption to boot!</p>'},
-        {'content' :
-          "<a href='#' title='' ><img src='image-3.jpg' alt='' /></a>",
-        'caption' : 
-          '<p>Wowee! Three slides!</p>'}
+          '<p>another caption to boot!</p>'}
     ]
 });
 //]]>
 </script>
+
+</body>
+</html>

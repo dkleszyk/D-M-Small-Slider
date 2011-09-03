@@ -1,0 +1,166 @@
+D@M Small Slider Version 0.10
+=============================
+
+
+Author
+------
+David J. Kleszyk, 2014
+
+
+What is this?
+-------------
+
+D@M Small Slider (DSS) is a lightweight, self-contained javascript 
+package designed to create a semantic slider that can be easily 
+styled and themed with external css. The goal of DSS is to fufill 
+the statement "when less is more than enough".
+
+
+Changes since last release
+--------------------------
+
+*   Captions no longer animate. Captions will toggle between visible 
+    or hidden during transitions. 
+
+*   'delta-t' and 'n-steps' removed as options. 
+
+*   'duration' added as new option to control animation length. 
+
+*   'tween' added as new option to allow for custom easing functions. 
+
+*   Default easing function is now SineInOut. 
+    
+*   Uses modular arithmetic for TRDL directions instead of conditions. 
+
+*   UglifyJS used for minification. Minified file is now 720 bytes 
+    smaller. 
+
+*   Animations now use requestAnimationFrame instead of setTimeout. 
+
+*   Restructured code into module system. Increased usage of closures 
+    to leak fewer variables. 
+
+
+Usage
+-----
+
+Using DSS is easy. If you want to add in a slider with the default 
+values, first add the css link in the head of your document.
+
+    <link rel="stylesheet" href="dss.css" type="text/css" media="screen" />
+
+Next, in the body of your document, make sure you have a definintion 
+list set up with the slides you want to use in your slider.
+
+    <dl id='your_id_here' class='dss'>
+        <dt><a href='...' title='' ><img src='...' alt='' /></a></dt>
+            <dd><p>...</p></dd>
+    </dl>
+
+Then, at the end of you document, link to the DSS Javascript file and 
+add the following code.
+
+    <script src='dss.js' type='text/javascript' ></script>
+    <script type='text/javascript' >
+    //<![CDATA[
+        var s = dss.slider('your_id_here');
+    //]]>
+    </script>
+
+The slider should be created, and start playing with a dwell of five 
+seconds per slide. 
+
+
+Advanced usage
+--------------
+
+Various methods are available for use if you want to tie in DSS 
+with other javascript operations. These methods are
+
+
+start 
+:   Starts the slider change timer.
+
+stop
+:   Stops the slide change timer.
+
+restart 
+:   Restarts the slide change timer. _Does not set slide back
+    to start value_
+
+slide(direction, ftl-override = null)
+:   Causes a transition in the direction specified (options 
+    being 'top', 'right', 'bottom', 'left', and 'random'). If
+    the ftl-override is set, the slideshow will be advanced that 
+    many slides (ftl-override should be an integer). 
+
+dir() 
+:   Gets the default forward transition direction. 
+
+ndir() 
+:   Gets the default reverse transition direction. 
+
+
+To set various options for the DSS slider, you can pass an options
+object as the second argument to the slider. Available options are
+
+
+dwell 
+:   Time between slide changes in milliseconds. Default 5000.
+
+ftl 
+:   First-to-last. If false, slides go in reverse order. 
+    Default true.
+
+new-slides 
+:   Dynamically add slides to the slider. Array of objects. 
+    Objects have properties 'content' and 'caption', 
+    which refer respectively to the inner HTML of the slide 
+    and caption. Captions added this way should include a 
+    <p></p> tag. Default empty array.
+
+start
+:   What slide to start at in the range [1,n]. Default 1.
+
+duration
+:   The time in milliseconds it takes to transition between 
+    slides. Default 750. 
+
+direction
+:   What direction slides should move in while animating. Can 
+    be left, right, top, bottom, or random. Default right.
+
+autostart
+:   Whether the animation timer should start when the slider
+    is created. Default true.
+    
+tween 
+:   The easing function to use for transitions. Takes the form of 
+    function(t, b, c, d). Default is SineInOut. 
+    
+    
+### Example 1
+
+    var s = dss.slider('your_id_here',{
+        'new-slides' : [
+            {'content' :
+              "<a href='#' title='' ><img src='image-2.jpg' alt='' /></a>",
+            'caption' : 
+              '<p>another caption to boot!</p>'},
+            {'content' :
+              "<a href='#' title='' ><img src='image-3.jpg' alt='' /></a>",
+            'caption' : 
+              '<p>Wowee! Three slides!</p>'}
+        ]
+    });
+    
+    Creates a slider with two additional slides added. The added slides 
+    contain images and have captions.
+    
+### Example 2
+
+    var s = dss.slider('your_id_here',{'autostart':false});
+    s.start();
+    
+    Creates a slider that will not start using the 'autostart' 
+    option, then manually starts it with the start command.

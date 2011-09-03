@@ -1,6 +1,6 @@
 // The MIT License (MIT) <http://www.opensource.org/licenses/mit-license.php>
 
-// Copyright (c) 2011 David J. Kleszyk
+// Copyright (c) 2014 David J. Kleszyk
 
 // Permission is hereby granted, free of charge, to any person 
 // obtaining a copy of this software and associated documentation files 
@@ -23,629 +23,277 @@
 // THE SOFTWARE.
 
 //namespace
-var dssn = {};
-//add class(element, class name)
-dssn.ac = function(el,s){var r=new RegExp(' '+s+' ','g');el.className=(' '+el.className+' ').replace(r,'').trim()+' '+s};
-
-//remove class(element, class name)
-dssn.rc = function(el,s){var r=new RegExp(s,'g');el.className=el.className.replace(r,'')};
-
-//move(direction, first element, not-direction, second element, original x, final x, current x, steps, delta-T
-dssn.m = function(d,el1,nd,el2,x0,xf,x,i,t){
-    var dx = (xf-x0)/i, nx = x + dx;
-    
-    //update positions
-    try{
-        el1.style[d] = nx + '%';
-    }catch(e){}
-    try{
-        el2.style[nd] = (100-nx) + '%';
-    }catch(e){}
-    
-    //if we haven't reached final destination, try again in delta-T
-    if( (x0 < xf && nx < xf) || (x0 > xf && nx > xf) ) {
-        setTimeout(function(){dssn.m(d,el1,nd,el2,x0,xf,nx,i,t)},t);
-        
-    //else, make sure we don't overshoot
-    } else {
-        try{
-            el1.style[d] = xf + '%';
-        }catch(e){}
-        try{
-            el2.style[nd] = (100-xf) + '%';
-        }catch(e){}
-    }
-};
-
-//create slider(element id, options list)
-function dss(g,o){
-    //defaults
-    var dflt = {
-        'dwell'      : 5000,    //time between slide changes
-        'ftl'        : true,    //first-to-last order?
+var dss = (function(module) {
+    var defaults = {
+        dwell        : 5000,    //time between slide changes
+        ftl          : true,    //first-to-last order?
         'new-slides' : [],      //new elements for dynamic creation
-        'start'      : 1,       //first slide in sequence range [1,n]
-        'delta-t'    : 5,       //animation timer increment
-        'n-steps'    : 50,      //animation steps
-        'direction'  : 'right', //what direction should slides move in?
-        'autostart'  : true     //auto start on load?
-    };
-
-    var 
-    dw = o['dwell']?o['dwell']:dflt['dwell'], 
-    ftl = o['ftl']?o['ftl']:dflt['ftl'], 
-    nwl = o['new-slides']?o['new-slides']:dflt['new-slides'], 
-    f = o['start']?o['start']:dflt['start'], 
-    dt = o['delta-t']?o['delta-t']:dflt['delta-t'], 
-    ns = o['n-steps']?o['n-steps']:dflt['n-steps'], 
-    r = o['direction']?o['direction']:dflt['direction'], 
-    as = o['autostart']?o['autostart']:dflt['autostart'], 
-    s = {},                            //slider object
-    el = document.getElementById(g),   //dl element
-    b = el.getElementsByTagName('DT'), //dt element array
-    a = [],                            //dd element array
-    d = document.createElement('DIV'), //container div
-    w,                                 //width of slider
-    h,                                 //height of slider
-    em,                                //height of em
-    p = document.createElement('A'),   //prev control link
-    n = document.createElement('A'),   //next control link
-    l,                                 //length variable
-    i,                                 //index variable
-    e;                                 //element variable
-
-    //turn the start from [1,n] to [0,n-1]
-    --f;
-    
-    //make sure element is actually a DL
-    if(el.nodeName.toUpperCase()!=='DL') {
-        return false;
-    }
-    
-    //get the current size the DL
-    w = el.clientWidth;
-    h = el.clientHeight;
-        
-    //create container around DL to position
-    //controls in. set height of DL to 10em
-    //to allow us to get the height of 1em
-    //so that container size can be relative
-    d.className = 'dss-c';
-    el.parentNode.insertBefore(d,el);
-    el.parentNode.removeChild(el);
-    d.appendChild(el);
-    
-    //calculate height of 1em, 
-    //then make sure that the 
-    //DL is not positioned
-    el.style.height = '10em';
-    em = el.offsetHeight/10.0;
-    el.style.position = 'static';
-    
-    //set the size of the container 
-    //in relative units
-    d.style.width = w/em + 'em';
-    d.style.height = h/em + 'em';
-    
-    //create controls
-    p.innerHTML = '&lsaquo;';
-    p.className = 'dss-ctrl prev';
-    p.title = 'Previous';
-    p.onclick = function(){s.restart();s.slide(s.ndir(),true,false)};
-    d.appendChild(p);
-    
-    n.innerHTML = '&rsaquo;';
-    n.className = 'dss-ctrl next';
-    n.title = 'Next';
-    n.onclick = function(){s.restart();s.slide(s.dir(),true,true)};
-    d.appendChild(n);
-    
-    //allow for dynamic creation of slides
-    //this allows for pages with less 
-    //initial http requests if there 
-    //are images in the slides
-    l = nwl.length;
-    for(i=0;i<l;i++){
-        var ndt = document.createElement('DT');
-        var ndd = document.createElement('DD');
-        ndt.innerHTML = nwl[i].content;
-        ndd.innerHTML = nwl[i].caption;
-        el.appendChild(ndt);
-        el.appendChild(ndd);
-        b[b.length] = ndt;
-    }
-    
-    //read in the current slides
-    l=b.length;
-    for(i=0;i<l;i++){
-        e = b[i];
-        
-        //hide any slides that aren't the start one
-        dssn.rc(e,'on');
-        if(i===f) {
-            dssn.ac(e,'on');
+        start        : 1,       //first slide in sequence range [1,n]
+        duration     : 750,     //animation duration
+        direction    : 'right', //what direction should slides move in?
+        autostart    : true,    //auto start on load?
+        tween        : function(t, b, c, d){return -c/2*(Math.cos(Math.PI*t/d)-1)+b;}
+    }, removeClass = function(element, className) {
+        var r = new RegExp(' '+className+' ','g');
+        element.className = (' '+element.className+' ').replace(r,'').trim();
+    }, addClass = function(element, className) {
+        removeClass(element, className);
+        element.className = (element.className + ' ' + className).trim();
+    }, getDefault = function(options, key) {
+        return typeof options !== 'undefined' && typeof options[key] !== 'undefined' ? options[key] : defaults[key];
+    }, move = function(tween, firstDirection, firstElement, otherDirection, otherElement, originalPct, finalPct, duration, callback) {
+        var start = null;
+        function step(timestamp) {
+            if(start === null) {
+                start = timestamp;
+            }
+            var currentTime = timestamp - start,
+                nextPct = tween.call(null, currentTime, originalPct, (finalPct-originalPct), duration);
+            if(currentTime < duration) {
+                if(firstElement) {
+                    firstElement.style[firstDirection] = nextPct + '%';
+                }
+                if(otherElement) {
+                    otherElement.style[otherDirection] = (100-nextPct) + '%';
+                }
+                window.requestAnimationFrame(step);
+            } else {
+                if(firstElement) {
+                    firstElement.style[firstDirection] = finalPct;
+                }
+                if(otherElement) {
+                    otherElement.style[otherDirection] = (100-finalPct) + '%';
+                }
+                if(callback) {
+                    callback.call(null); 
+                }
+            }
         }
-        
-        //find the captions for the current slide
-        a[i]=[];
-        
-        //we can have text nodes and DD's
-        while( e.nextSibling && (
-          e.nextSibling.nodeName.toLowerCase() === '#text' ||
-          e.nextSibling.nodeName.toUpperCase() === 'DD'
-          ) 
+        window.requestAnimationFrame(step);
+    };
+    
+    module.slider = function(elementId, options) {
+        var s = {
+                lock: false, 
+                dwell: getDefault(options, 'dwell'), 
+                currentSlide: getDefault(options, 'start')-1, //change from [1..n] to [0..n-1]
+                duration: getDefault(options, 'duration'), 
+                direction: getDefault(options, 'direction'), 
+                firstToLast: 2*!!getDefault(options, 'ftl')-1, // change true/false to 1/-1
+                tweenCb: getDefault(options, 'tween'),
+                stop: function() {
+                    clearInterval(this.intervalTimer); 
+                },
+                start: function() {
+                    var t = this; 
+                    t.intervalTimer = setInterval(function(){t.slide(t.dir());},t.dwell);
+                },
+                restart: function() {
+                    this.stop();
+                    this.start(); 
+                }
+            }, 
+            autostart = getDefault(options, 'autostart'), 
+            newSlides = getDefault(options, 'new-slides'), 
+            dlElement = document.getElementById(elementId), 
+            images = dlElement.getElementsByTagName('IMG'), 
+            slides = dlElement.getElementsByTagName('DT'), 
+            captions = [], 
+            container = document.createElement('div'), 
+            width = dlElement.clientWidth, 
+            height = dlElement.clientHeight, 
+            emHeight, 
+            prev = document.createElement('A'),
+            next = document.createElement('A'),
+            l = images.length, 
+            directions = ['top', 'right', 'bottom', 'left', 'random'], 
+            i, temp;
+
+        if(dlElement.nodeName.toUpperCase() !== 'DL'
+            || (slides.length + newSlides.length) < 2
+            || directions.indexOf(s.direction) < 0
         ) {
-            e = e.nextSibling;
+            if(window.console) {
+                console.error("Unable to create slider: "+elementId);
+            }
+            return false;
+        }
+
+        //remove 'random' from actual list of directions
+        directions.pop();
+
+        //since we rely on knowing the image sizes, do not 
+        //create slider if images have not loaded yet
+        for(i=0; i<l; i++) {
+            if(!images[i].complete) {
+                return false;
+            }
+        }
+
+        //create container around DL to position
+        //controls in. set height of DL to 1000em
+        //to allow us to get the height of 1em
+        //so that container size can be relative
+        container.className = 'dss-c';
+        dlElement.parentNode.insertBefore(container, dlElement);
+        dlElement.parentNode.removeChild(dlElement);
+        container.appendChild(dlElement);
+
+        //calculate height of 1em, 
+        //then make sure that the 
+        //DL is not positioned
+        temp = dlElement.style.height;
+        dlElement.style.height = '1000em';
+        emHeight = dlElement.offsetHeight/1000.0;
+        dlElement.style.position = 'static';
+        dlElement.style.height = temp;
+
+        //create controls
+        prev.innerHTML = '&lsaquo;';
+        prev.className = 'dss-ctrl prev';
+        prev.title = 'Previous';
+        prev.onclick = function(){s.restart();s.slide(s.ndir(),-1);};
+        container.appendChild(prev);
+        
+        next.innerHTML = '&rsaquo;';
+        next.className = 'dss-ctrl next';
+        next.title = 'Next';
+        next.onclick = function(){s.restart();s.slide(s.dir(),1);};
+        container.appendChild(next);
+        
+        //allow for dynamic creation of slides
+        //this allows for pages with less 
+        //initial http requests if there 
+        //are images in the slides
+        l = newSlides.length;
+        for(i=0; i<l; i++){
+            temp = document.createElement('DT');
+            temp.innerHTML = newSlides[i].content;
+            dlElement.appendChild(temp);
+            slides[slides.length] = temp;
+            temp = document.createElement('DD');
+            temp.innerHTML = newSlides[i].caption;
+            dlElement.appendChild(temp);
+        }
+        
+        //read in the current slides
+        l = slides.length;
+        for(i=0; i<l; i++){
+            temp = slides[i];
             
-            //skip over text nodes
-            if(e.nodeName === '#text') {
-                continue;
+            //hide any slides that aren't the start one
+            removeClass(temp, 'on');
+            if(i === s.currentSlide) {
+                addClass(temp, 'on');
             }
             
-            //hide any captions that aren't the start one
-            dssn.rc(e,'on');
-            if(i===f) {
-                dssn.ac(e,'on');
+            //find the captions for the current slide
+            captions[i]=[];
+            
+            //we can have text nodes and DD's
+            while( temp.nextSibling && (
+                temp.nextSibling.nodeName.toLowerCase() === '#text' ||
+                temp.nextSibling.nodeName.toUpperCase() === 'DD'
+              ) 
+            ) {
+                temp = temp.nextSibling;
+                
+                //skip over text nodes
+                if(temp.nodeName !== '#text') {
+                    //hide any captions that aren't the start one
+                    removeClass(temp, 'on');
+                    if(i === s.currentSlide) {
+                        addClass(temp, 'on');
+                    }
+                    
+                    //put the caption into the array
+                    captions[i].push(temp);
+                }
             }
-            
-            //put the caption into the array
-            a[i].push(e); 
-        }
-    }
-    
-    //valid directions for movement
-    s.rs = ['top','right','bottom','left'];
-    
-    s.s=f;        //start slide
-    s.c=f;        //current slide
-    s.f=0;        //first slide
-    s.l=--l;      //last slide, note this works because last set of l is to b.length
-    s.t=b;        //content boxes
-    s.d=a;        //caption boxes
-    s.ftl=ftl;    //first-to-last
-    s.n = ns;     //animation steps
-    s.i = dt;     //animation timing
-    s.w = dw;     //pause between slides
-    s.r = r;      //default direction
-    s.v = null;   //interval timer
-    
-    //slide(direction, ftl paramenter override, ftl value)
-    s.slide = function(dir,ftld,ftl){
-        var f,  //first-to-last
-        ct,     //current slide
-        cd,     //current caption
-        nt,     //next slide
-        nd,     //next caption
-        ci,     //current index
-        ni,     //next index
-        i,      //animation timing
-        n,      //animation steps
-        di,     //direction index
-        ndir,   //negative direction
-        adir,   //adjacent direction
-        odir;   //opposite direction
-
-        //get some variables from our object
-        i = this.i;
-        n = this.n;
-        f = this.ftl;
-
-        //use the parameter for first-to-last if override is set
-        if(ftld) {
-            f = ftl;
         }
 
-        ci = ni = this.c; //set both indices to current
-        if(f){
-            ni = (++ni>this.l?this.f:ni); //increment with wrap around if first-to-last
-        } else {
-            ni = (--ni<this.f?this.l:ni); //decrement with wrap around if last-to-first
-        }
-        
-        ct = this.t[ci];    //get the current slide
-        cd = this.d[ci][0]; //get the current caption not dealing with multiple captions yet
-        nt = this.t[ni];    //get the next slide
-        nd = this.d[ni][0]; //get the next caption
-        
-        //set up the direction indices
-        di = this.rs.indexOf(dir);
-        if(di<0) {
-            return;
-        } else {
-            adir = this.rs[(di-1<0?di+3:di-1)];
-            ndir = this.rs[(di-2<0?di+2:di-2)];
-            odir = this.rs[(di-3<0?di+1:di-3)];
-        }
-        
-        //position the current and next slides to where they need to be
-        //at the start of the animation
-        nt.style[ndir] = '-100%';
-        ct.style[dir] = ct.style[adir] = nt.style[adir] = '0';
-        ct.style[odir] = nt.style[odir] = ct.style[ndir] = nt.style[dir] =  '';
-        
-        //position the current and next captions to where they need to be 
-        //at the start of the animation
-        nd.style.top = '-100%';
-        cd.style.top = cd.style.left = '0';
-        cd.style.right = cd.style.bottom = nd.style.right = nd.style.bottom ='';
-        
-        //unhide the next slide and caption
-        dssn.ac(nt,'on');
-        dssn.ac(nd,'on');
-        
-        //animation sequence goes like this
-        // 1. move the current caption out of the way
-        // 2. move the current and next slides into position
-        // 3. move the next caption into position
-        // 4. hide the current (now previous) slide and caption
-        dssn.m('top',cd,'',null,0,-100,0,n,i);
-        setTimeout(function(){dssn.m(dir,ct,ndir,nt,0,100,0,n,i)},n*i);
-        setTimeout(function(){dssn.m('top',nd,'',null,-100,0,-100,n,i)},2*n*i);
-        setTimeout(function(){dssn.rc(ct,'on');dssn.rc(cd,'on')},3*n*i);
-        
-        //update the index to the next index
-        this.c = ni;
-    };
-    
-    //clears the interval
-    s.stop = function() {
-        clearInterval(this.v);
-    };
-    
-    //starts the interval with delta-T of dwell time
-    s.start = function() {
-        var t,that = this;
-        t = this.w;
-        this.v = setInterval(function(){that.slide(that.dir())},t);
-    };
-    
-    //reset the interval
-    s.restart = function() {
-        this.stop();
-        this.start();
-    };
-    
-    //returns the direction the slider is going in,
-    //or a random direction
-    s.dir = function() {
-        var di = this.rs.indexOf(this.r);
-        if(di >= 0) {
-            return this.rs[di]
-        } else {
-            return this.rs[Math.floor(Math.random()*this.rs.length)];
-        }
-    };
-    
-    //returns the not-direction the slider is going in,
-    //or a random direction
-    s.ndir = function() {
-        var di = this.rs.indexOf(this.r),
-        l=this.rs.length;
-        if(di >= 0) {
-            return this.rs[(di-l/2<0?di+l/2:di-l/2)]
-        } else {
-            return this.rs[Math.floor(Math.random()*l)];
-        }
-    };
-    
-    //start if autostart enabled
-    if(as) {
-        s.start();
-    }
-    
-    return s;
-}
+        //set the size of the container 
+        //in relative units
+        container.style.width = (width/emHeight) + 'em';
+        container.style.height = (height/emHeight) + 'em';
 
-//namespace
-var dssn = {};
-//add class(element, class name)
-dssn.ac = function(el,s){var r=new RegExp(' '+s+' ','g');el.className=(' '+el.className+' ').replace(r,'').trim()+' '+s};
-
-//remove class(element, class name)
-dssn.rc = function(el,s){var r=new RegExp(s,'g');el.className=el.className.replace(r,'')};
-
-//move(direction, first element, not-direction, second element, original x, final x, current x, steps, delta-T
-dssn.m = function(d,el1,nd,el2,x0,xf,x,i,t){
-    var dx = (xf-x0)/i, nx = x + dx;
-    
-    //update positions
-    try{
-        el1.style[d] = nx + '%';
-    }catch(e){}
-    try{
-        el2.style[nd] = (100-nx) + '%';
-    }catch(e){}
-    
-    //if we haven't reached final destination, try again in delta-T
-    if( (x0 < xf && nx < xf) || (x0 > xf && nx > xf) ) {
-        setTimeout(function(){dssn.m(d,el1,nd,el2,x0,xf,nx,i,t)},t);
-        
-    //else, make sure we don't overshoot
-    } else {
-        try{
-            el1.style[d] = xf + '%';
-        }catch(e){}
-        try{
-            el2.style[nd] = (100-xf) + '%';
-        }catch(e){}
-    }
-};
-
-//create slider(element id, options list)
-function dss(g,o){
-    //defaults
-    var dflt = {
-        'dwell'      : 5000,    //time between slide changes
-        'ftl'        : true,    //first-to-last order?
-        'new-slides' : [],      //new elements for dynamic creation
-        'start'      : 1,       //first slide in sequence range [1,n]
-        'delta-t'    : 5,       //animation timer increment
-        'n-steps'    : 50,      //animation steps
-        'direction'  : 'right', //what direction should slides move in?
-        'autostart'  : true     //auto start on load?
-    };
-
-    var 
-    dw = o['dwell']?o['dwell']:dflt['dwell'], 
-    ftl = o['ftl']?o['ftl']:dflt['ftl'], 
-    nwl = o['new-slides']?o['new-slides']:dflt['new-slides'], 
-    f = o['start']?o['start']:dflt['start'], 
-    dt = o['delta-t']?o['delta-t']:dflt['delta-t'], 
-    ns = o['n-steps']?o['n-steps']:dflt['n-steps'], 
-    r = o['direction']?o['direction']:dflt['direction'], 
-    as = o['autostart']?o['autostart']:dflt['autostart'], 
-    s = {},                            //slider object
-    el = document.getElementById(g),   //dl element
-    b = el.getElementsByTagName('DT'), //dt element array
-    a = [],                            //dd element array
-    d = document.createElement('DIV'), //container div
-    w,                                 //width of slider
-    h,                                 //height of slider
-    em,                                //height of em
-    p = document.createElement('A'),   //prev control link
-    n = document.createElement('A'),   //next control link
-    l,                                 //length variable
-    i,                                 //index variable
-    e;                                 //element variable
-
-    //turn the start from [1,n] to [0,n-1]
-    --f;
-    
-    //make sure element is actually a DL
-    if(el.nodeName.toUpperCase()!=='DL') {
-        return false;
-    }
-    
-    //get the current size the DL
-    w = el.clientWidth;
-    h = el.clientHeight;
-        
-    //create container around DL to position
-    //controls in. set height of DL to 10em
-    //to allow us to get the height of 1em
-    //so that container size can be relative
-    d.className = 'dss-c';
-    el.parentNode.insertBefore(d,el);
-    el.parentNode.removeChild(el);
-    d.appendChild(el);
-    
-    //calculate height of 1em, 
-    //then make sure that the 
-    //DL is not positioned
-    el.style.height = '10em';
-    em = el.offsetHeight/10.0;
-    el.style.position = 'static';
-    
-    //set the size of the container 
-    //in relative units
-    d.style.width = w/em + 'em';
-    d.style.height = h/em + 'em';
-    
-    //create controls
-    p.innerHTML = '&lsaquo;';
-    p.className = 'dss-ctrl prev';
-    p.title = 'Previous';
-    p.onclick = function(){s.restart();s.slide(s.ndir(),true,false)};
-    d.appendChild(p);
-    
-    n.innerHTML = '&rsaquo;';
-    n.className = 'dss-ctrl next';
-    n.title = 'Next';
-    n.onclick = function(){s.restart();s.slide(s.dir(),true,true)};
-    d.appendChild(n);
-    
-    //allow for dynamic creation of slides
-    //this allows for pages with less 
-    //initial http requests if there 
-    //are images in the slides
-    l = nwl.length;
-    for(i=0;i<l;i++){
-        var ndt = document.createElement('DT');
-        var ndd = document.createElement('DD');
-        ndt.innerHTML = nwl[i].content;
-        ndd.innerHTML = nwl[i].caption;
-        el.appendChild(ndt);
-        el.appendChild(ndd);
-        b[b.length] = ndt;
-    }
-    
-    //read in the current slides
-    l=b.length;
-    for(i=0;i<l;i++){
-        e = b[i];
-        
-        //hide any slides that aren't the start one
-        dssn.rc(e,'on');
-        if(i===f) {
-            dssn.ac(e,'on');
-        }
-        
-        //find the captions for the current slide
-        a[i]=[];
-        
-        //we can have text nodes and DD's
-        while( e.nextSibling && (
-          e.nextSibling.nodeName.toLowerCase() === '#text' ||
-          e.nextSibling.nodeName.toUpperCase() === 'DD'
-          ) 
-        ) {
-            e = e.nextSibling;
-            
-            //skip over text nodes
-            if(e.nodeName === '#text') {
-                continue;
+        //note that at this point 'l' is set to slides.length
+        s.slide = function(direction) {
+            if(this.lock) {
+                return;
             }
-            
-            //hide any captions that aren't the start one
-            dssn.rc(e,'on');
-            if(i===f) {
-                dssn.ac(e,'on');
+            this.lock = true;
+            var t = this, 
+                args = arguments, 
+                firstToLast = t.firstToLast * (args.length === 1 ? 1 : args[1]), 
+                currentIndex = t.currentSlide, 
+                currentSlide = slides[currentIndex], 
+                currentCaption = captions[currentIndex][0], 
+                nextIndex = currentIndex + firstToLast, 
+                directionIndex = directions.indexOf(direction); 
+
+            if(directionIndex < 0) {
+                return;
             }
+
+            if(nextIndex < 0) {nextIndex = (l-1);}
+            if(nextIndex > (l-1)) {nextIndex = 0;}
+
+            var nextSlide = slides[nextIndex],
+                nextCaption = captions[nextIndex][0],
+                
+                adjacentDirection = directions[(directionIndex+3)%4],
+                notDirection = directions[(directionIndex+2)%4],
+                opposingDirection = directions[(directionIndex+1)%4];
+                
+            //position the current and next slides to where they need to be
+            //at the start of the animation
+            nextSlide.style[notDirection] = '-100%';
+            currentSlide.style[direction] = currentSlide.style[adjacentDirection] = nextSlide.style[adjacentDirection] = '0';
+            currentSlide.style[opposingDirection] = nextSlide.style[opposingDirection] = currentSlide.style[notDirection] = nextSlide.style[direction] =  '';
             
-            //put the caption into the array
-            a[i].push(e); 
-        }
-    }
-    
-    //valid directions for movement
-    s.rs = ['top','right','bottom','left'];
-    
-    s.s=f;        //start slide
-    s.c=f;        //current slide
-    s.f=0;        //first slide
-    s.l=--l;      //last slide, note this works because last set of l is to b.length
-    s.t=b;        //content boxes
-    s.d=a;        //caption boxes
-    s.ftl=ftl;    //first-to-last
-    s.n = ns;     //animation steps
-    s.i = dt;     //animation timing
-    s.w = dw;     //pause between slides
-    s.r = r;      //default direction
-    s.v = null;   //interval timer
-    
-    //slide(direction, ftl paramenter override, ftl value)
-    s.slide = function(dir,ftld,ftl){
-        var f,  //first-to-last
-        ct,     //current slide
-        cd,     //current caption
-        nt,     //next slide
-        nd,     //next caption
-        ci,     //current index
-        ni,     //next index
-        i,      //animation timing
-        n,      //animation steps
-        di,     //direction index
-        ndir,   //negative direction
-        adir,   //adjacent direction
-        odir;   //opposite direction
+            //position the current and next captions to where they need to be 
+            //at the start of the animation
+            nextCaption.style.top = '0';
+            currentCaption.style.top = currentCaption.style.left = nextCaption.style.left = '0';
+            currentCaption.style.right = currentCaption.style.bottom = nextCaption.style.right = nextCaption.style.bottom ='';
+            
+            addClass(nextSlide, 'on');
+            removeClass(currentCaption, 'on'); 
+            move(t.tweenCb, direction, currentSlide, notDirection, nextSlide, 0, 100, t.duration, function() {
+                    removeClass(currentSlide, 'on');
+                    addClass(nextCaption, 'on');
+                    t.currentSlide = nextIndex; 
+                    t.lock = false; 
+            });
+        };
+        
+        //returns the direction the slider is going in,
+        //or a random direction
+        s.dir = function() {
+            var t = this, directionIndex = directions.indexOf(t.direction);
+            return ( directionIndex < 0 ? 
+                directions[Math.floor(Math.random()*4)] : 
+                t.direction
+            );
+        };
 
-        //get some variables from our object
-        i = this.i;
-        n = this.n;
-        f = this.ftl;
-
-        //use the parameter for first-to-last if override is set
-        if(ftld) {
-            f = ftl;
+        //returns the not-direction the slider is going in,
+        //or a random direction
+        s.ndir = function() {
+            var t = this, directionIndex = directions.indexOf(t.direction);
+            return ( directionIndex < 0 ? 
+                directions[Math.floor(Math.random()*4)] : 
+                directions[(directionIndex+2)%4]
+            );
+        };
+        
+        if(autostart) {
+            s.start(); 
         }
 
-        ci = ni = this.c; //set both indices to current
-        if(f){
-            ni = (++ni>this.l?this.f:ni); //increment with wrap around if first-to-last
-        } else {
-            ni = (--ni<this.f?this.l:ni); //decrement with wrap around if last-to-first
-        }
-        
-        ct = this.t[ci];    //get the current slide
-        cd = this.d[ci][0]; //get the current caption not dealing with multiple captions yet
-        nt = this.t[ni];    //get the next slide
-        nd = this.d[ni][0]; //get the next caption
-        
-        //set up the direction indices
-        di = this.rs.indexOf(dir);
-        if(di<0) {
-            return;
-        } else {
-            adir = this.rs[(di-1<0?di+3:di-1)];
-            ndir = this.rs[(di-2<0?di+2:di-2)];
-            odir = this.rs[(di-3<0?di+1:di-3)];
-        }
-        
-        //position the current and next slides to where they need to be
-        //at the start of the animation
-        nt.style[ndir] = '-100%';
-        ct.style[dir] = ct.style[adir] = nt.style[adir] = '0';
-        ct.style[odir] = nt.style[odir] = ct.style[ndir] = nt.style[dir] =  '';
-        
-        //position the current and next captions to where they need to be 
-        //at the start of the animation
-        nd.style.top = '-100%';
-        cd.style.top = cd.style.left = '0';
-        cd.style.right = cd.style.bottom = nd.style.right = nd.style.bottom ='';
-        
-        //unhide the next slide and caption
-        dssn.ac(nt,'on');
-        dssn.ac(nd,'on');
-        
-        //animation sequence goes like this
-        // 1. move the current caption out of the way
-        // 2. move the current and next slides into position
-        // 3. move the next caption into position
-        // 4. hide the current (now previous) slide and caption
-        dssn.m('top',cd,'',null,0,-100,0,n,i);
-        setTimeout(function(){dssn.m(dir,ct,ndir,nt,0,100,0,n,i)},n*i);
-        setTimeout(function(){dssn.m('top',nd,'',null,-100,0,-100,n,i)},2*n*i);
-        setTimeout(function(){dssn.rc(ct,'on');dssn.rc(cd,'on')},3*n*i);
-        
-        //update the index to the next index
-        this.c = ni;
+        return s; 
     };
-    
-    //clears the interval
-    s.stop = function() {
-        clearInterval(this.v);
-    };
-    
-    //starts the interval with delta-T of dwell time
-    s.start = function() {
-        var t,that = this;
-        t = this.w;
-        this.v = setInterval(function(){that.slide(that.dir())},t);
-    };
-    
-    //reset the interval
-    s.restart = function() {
-        this.stop();
-        this.start();
-    };
-    
-    //returns the direction the slider is going in,
-    //or a random direction
-    s.dir = function() {
-        var di = this.rs.indexOf(this.r);
-        if(di >= 0) {
-            return this.rs[di]
-        } else {
-            return this.rs[Math.floor(Math.random()*this.rs.length)];
-        }
-    };
-    
-    //returns the not-direction the slider is going in,
-    //or a random direction
-    s.ndir = function() {
-        var di = this.rs.indexOf(this.r),
-        l=this.rs.length;
-        if(di >= 0) {
-            return this.rs[(di-l/2<0?di+l/2:di-l/2)]
-        } else {
-            return this.rs[Math.floor(Math.random()*l)];
-        }
-    };
-    
-    //start if autostart enabled
-    if(as) {
-        s.start();
-    }
-    
-    return s;
-}
+    return module;
+
+}(dss || {}));
